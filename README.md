@@ -21,6 +21,7 @@ This is work in progress.
 * https://github.com/mozilla-services/requests-hawk
 * https://developer.mozilla.org/en-US/docs/Mozilla/Tech/Firefox_Accounts/Introduction
 * https://fxa.readthedocs.io/en/latest/
+* https://mozilla-services.readthedocs.io/en/latest/howtos/run-fxa.html#howto-run-fxa
 
 ### Hawk
 
