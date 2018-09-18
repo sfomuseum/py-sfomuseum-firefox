@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+# this is derived/cloned/only-barely-modified from this:
+# https://github.com/mozilla-services/syncclient/issues/30
+
 import getpass
 import sys
 import math
