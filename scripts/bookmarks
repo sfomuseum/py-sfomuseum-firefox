@@ -1,0 +1,134 @@
+#!/usr/bin/env python
+
+import getpass
+import sys
+import math
+import json
+import hmac
+import hashlib
+import base64
+import logging
+
+from Crypto.Cipher import AES
+from Crypto import Random
+from syncclient.client import SyncClient, FxAClient, TOKENSERVER_URL, six, hexlify, sha256
+
+def main():
+
+    import optparse
+    opt_parser = optparse.OptionParser()
+
+    opt_parser.add_option('-u', '--user', dest='user', action='store', default=None, help='...')
+    opt_parser.add_option('-i', '--interactive', dest='interactive', action='store_true', default=True, help='...')    
+
+    opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is false)')
+     
+    options, args = opt_parser.parse_args()
+
+    if options.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    user = options.user
+    pswd = None
+
+    if options.interactive:
+        pswd = getpass.getpass()
+    else:
+        raise Exception, "this only works in interactive mode"
+    
+    # Login to FxA and get the keys.
+    
+    fxaSession = FxAClient().login(user, pswd, keys=True)
+    fxaSession.fetch_keys()
+
+    # Connect to sync using FxA browserid assertion
+    
+    bid_assertion_args = get_browserid_assertion(fxaSession)
+    client = SyncClient(*bid_assertion_args)
+
+    sync_keys = KeyBundle.fromMasterKey(fxaSession.keys[1], "identity.mozilla.com/picl/v1/oldsync")
+
+    # Fetch the sync bundle keys out of storage.
+    # They're encrypted with the account-level key.
+    
+    keys = decrypt_payload(client.get_record('crypto', 'keys'), sync_keys)
+
+    # Now use those keys to decrypt the records of interest.
+    
+    bulk_keys = KeyBundle(base64.b64decode(keys["default"][0]), base64.b64decode(keys["default"][1]))
+    
+    bookmarks = []
+
+    for record in client.get_records('bookmarks'):
+        record = decrypt_payload(record, bulk_keys)
+        bookmarks.append(record)
+
+    json.dump(bookmarks, sys.stdout, indent=2)
+
+
+def decrypt_payload(record, key_bundle):
+    j = json.loads(record["payload"])
+    # Always check the hmac before decrypting anything.
+    expected_hmac = hmac.new(key_bundle.hmac_key, j['ciphertext'], hashlib.sha256).hexdigest()
+    if j['hmac'] != expected_hmac:
+        raise ValueError("HMAC mismatch: %s != %s" % (j['hmac'], expected_hmac))
+    ciphertext = base64.b64decode(j['ciphertext'])
+    iv = base64.b64decode(j['IV'])
+    aes = AES.new(key_bundle.encryption_key, AES.MODE_CBC, iv)
+    plaintext = aes.decrypt(ciphertext).strip()
+    # Remove any CBC block padding, assuming it's a well-formed JSON payload.
+    plaintext = plaintext[:plaintext.rfind("}") + 1]
+    return json.loads(plaintext)
+
+
+def get_browserid_assertion(fxaSession, tokenserver_url=TOKENSERVER_URL):
+    bid_assertion = fxaSession.get_identity_assertion(tokenserver_url)
+    _, keyB = fxaSession.keys
+    if isinstance(keyB, six.text_type):  # pragma: no cover
+        keyB = keyB.encode('utf-8')
+    return bid_assertion, hexlify(sha256(keyB).digest()[0:16])
+
+
+class KeyBundle:
+
+    def __init__(self, encryption_key, hmac_key):
+        self.encryption_key = encryption_key
+        self.hmac_key = hmac_key 
+
+    @classmethod
+    def fromMasterKey(cls, master_key, info):
+        key_material = HKDF(master_key, None, info, 2 * 32)
+        return cls(key_material[:32], key_material[32:])
+
+
+def HKDF_extract(salt, IKM, hashmod=hashlib.sha256):
+    """HKDF-Extract; see RFC-5869 for the details."""
+    if salt is None:
+        salt = b"\x00" * hashmod().digest_size
+    return hmac.new(salt, IKM, hashmod).digest()
+
+
+def HKDF_expand(PRK, info, L, hashmod=hashlib.sha256):
+    """HKDF-Expand; see RFC-5869 for the details."""
+    digest_size = hashmod().digest_size
+    N = int(math.ceil(L * 1.0 / digest_size))
+    assert N <= 255
+    T = b""
+    output = []
+    for i in xrange(1, N + 1):
+        data = T + info + chr(i)
+        T = hmac.new(PRK, data, hashmod).digest()
+        output.append(T)
+    return b"".join(output)[:L]
+
+
+def HKDF(secret, salt, info, size, hashmod=hashlib.sha256):
+    """HKDF-extract-and-expand as a single function."""
+    PRK = HKDF_extract(salt, secret, hashmod)
+    return HKDF_expand(PRK, info, size, hashmod)
+
+
+if __name__ == '__main__':
+    main()
