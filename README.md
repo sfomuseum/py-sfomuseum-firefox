@@ -29,3 +29,8 @@ This is work in progress.
 * https://github.com/hueniverse/hawk
 * https://github.com/mozilla-services/requests-hawk
 * https://blog.mozilla.org/services/2015/02/05/whats-hawk-and-how-to-use-it/
+
+### Misc
+
+* https://github.com/mozilla/fxa-auth-server/wiki/onepw-protocol
+* https://github.com/mozilla/fxa-auth-server/blob/master/docs/api.md
