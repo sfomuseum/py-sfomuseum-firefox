@@ -18,6 +18,7 @@ This is work in progress.
 ### Firefox accounts
 
 * https://github.com/mozilla/PyFxA
+* https://github.com/mozilla/fxa-js-client
 * https://github.com/mozilla-services/requests-hawk
 * https://developer.mozilla.org/en-US/docs/Mozilla/Tech/Firefox_Accounts/Introduction
 * https://fxa.readthedocs.io/en/latest/
