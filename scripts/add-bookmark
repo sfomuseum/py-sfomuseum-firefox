@@ -54,21 +54,54 @@ def main():
     # https://github.com/mozilla-services/syncclient/blob/master/syncclient/client.py#L237
     
     collection = "bookmarks"
+
+    """
+      {
+    "dateAdded": 1537203599742, 
+    "title": "Web Authentication API - Web APIs | MDN", 
+    "parentName": "Other Bookmarks", 
+    "loadInSidebar": false, 
+    "bmkUri": "https://developer.mozilla.org/en-US/docs/Web/API/Web_Authentication_API#Browser_compatibility", 
+    "parentid": "unfiled", 
+    "type": "bookmark", 
+    "id": "ELOSadMpKvWJ", 
+    "tags": [
+      "security", 
+      "webauthn"
+    ]
+    },
+    """
     
     record = {
-        "title": "",
-        "bmkUri": "",
-        "description": "",
+        "id": "debug",
+        "title": "Mills Field",
+        "bmkUri": "https://millsfield.sfomuseum.org",
+        # "description": "",
         "loadInSidebar": False,
-        "tags": [],
-        "keyword": "",
-        "parentid": "",
-        "parentName": "",
-        "predecessorid": "",
+        "tags": ["sfomuseum"],
+        # "keyword": "",
+        "parentid": "unfiled",
+        "parentName": "Other Bookmarks",
+        # "predecessorid": "",
         "type": "bookmark"
     }
+
+    """
+    This fails with:
+
+    requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://sync-***-us-west-2.sync.services.mozilla.com/1.5/108942993/storage/bookmarks/debug
+
+    Because... ???
+    """
     
     print client.put_record(collection, record)
 
+def get_browserid_assertion(fxaSession, tokenserver_url=TOKENSERVER_URL):
+    bid_assertion = fxaSession.get_identity_assertion(tokenserver_url)
+    _, keyB = fxaSession.keys
+    if isinstance(keyB, six.text_type):  # pragma: no cover
+        keyB = keyB.encode('utf-8')
+    return bid_assertion, hexlify(sha256(keyB).digest()[0:16])
+    
 if __name__ == '__main__':
     main()
