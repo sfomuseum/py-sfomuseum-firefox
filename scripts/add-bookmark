@@ -1,0 +1,74 @@
+#!/usr/bin/env python
+
+# this is derived/cloned/only-barely-modified from this:
+# https://github.com/mozilla-services/syncclient/issues/30
+
+import getpass
+import sys
+import math
+import json
+import hmac
+import hashlib
+import base64
+import logging
+
+from Crypto.Cipher import AES
+from Crypto import Random
+from syncclient.client import SyncClient, FxAClient, TOKENSERVER_URL, six, hexlify, sha256
+
+def main():
+
+    import optparse
+    opt_parser = optparse.OptionParser()
+
+    opt_parser.add_option('-u', '--user', dest='user', action='store', default=None, help='...')
+    opt_parser.add_option('-i', '--interactive', dest='interactive', action='store_true', default=True, help='...')    
+
+    opt_parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Be chatty (default is false)')
+     
+    options, args = opt_parser.parse_args()
+
+    if options.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    user = options.user
+    pswd = None
+
+    if options.interactive:
+        pswd = getpass.getpass()
+    else:
+        raise Exception, "this only works in interactive mode"
+    
+    # Login to FxA and get the keys.
+    
+    fxaSession = FxAClient().login(user, pswd, keys=True)
+    fxaSession.fetch_keys()
+
+    # Connect to sync using FxA browserid assertion
+    
+    bid_assertion_args = get_browserid_assertion(fxaSession)
+    client = SyncClient(*bid_assertion_args)
+
+    # https://github.com/mozilla-services/syncclient/blob/master/syncclient/client.py#L237
+    
+    collection = "bookmarks"
+    
+    record = {
+        "title": "",
+        "bmkUri": "",
+        "description": "",
+        "loadInSidebar": False,
+        "tags": [],
+        "keyword": "",
+        "parentid": "",
+        "parentName": "",
+        "predecessorid": "",
+        "type": "bookmark"
+    }
+    
+    print client.put_record(collection, record)
+
+if __name__ == '__main__':
+    main()
